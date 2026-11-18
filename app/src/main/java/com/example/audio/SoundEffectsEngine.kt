@@ -31,6 +31,7 @@ class SoundEffectsEngine(context: Context) {
   @Volatile var vibrationEnabled: Boolean = true
 
   private val clickSample by lazy { synthTone(520.0, 740.0, 0.045, 0.25) }
+  private val tockSample by lazy { synthTone(340.0, 175.0, 0.055, 0.30) }
   private val bonkSample by lazy { synthTone(210.0, 95.0, 0.14, 0.45) }
   private val whooshSample by lazy { synthTone(280.0, 620.0, 0.16, 0.28) }
   private val dingSample by lazy { synthChord(listOf(880.0, 1108.73, 1318.51), 0.28, 0.35) }
@@ -46,6 +47,10 @@ class SoundEffectsEngine(context: Context) {
 
   fun playClick() {
     if (soundEnabled) playPcm(clickSample)
+  }
+
+  fun playTock() {
+    if (soundEnabled) playPcm(tockSample)
   }
 
   fun playBonk() {

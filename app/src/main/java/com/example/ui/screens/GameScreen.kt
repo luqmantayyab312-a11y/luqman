@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,23 +30,26 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsRun
-import androidx.compose.material.icons.filled.LocalParking
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -69,16 +74,10 @@ import com.example.ui.components.ShopDialog
 import com.example.ui.components.UnlockSlotDialog
 import com.example.ui.components.WaitingSlotsRow
 import com.example.ui.components.WinLevelDialog
-import com.example.ui.theme.AlertRed
 import com.example.ui.theme.FredokaFontFamily
-import com.example.ui.theme.GoldCoinDark
-import com.example.ui.theme.HudBlue
-import com.example.ui.theme.HudBlueDark
 import com.example.ui.theme.OutlineInk
 import com.example.ui.theme.PlayGreen
 import com.example.ui.theme.PlayGreenDark
-import com.example.ui.theme.ShopPurple
-import com.example.ui.theme.ShopPurpleDark
 
 @Composable
 fun GameScreen(
@@ -113,10 +112,29 @@ fun GameScreen(
     }
   }
 
-  BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+  val focusRequester = remember { FocusRequester() }
+  LaunchedEffect(Unit) {
+    focusRequester.requestFocus()
+  }
+
+  BoxWithConstraints(
+    modifier =
+      modifier
+        .fillMaxSize()
+        .focusRequester(focusRequester)
+        .focusable()
+        .onPreviewKeyEvent { event ->
+          if (event.type == KeyEventType.KeyDown && event.key == Key.D) {
+            viewModel.toggleLaneDebug()
+            true
+          } else {
+            false
+          }
+        }
+  ) {
     val screenH = maxHeight
 
-    // 1. Exact full-bleed gameplay background provided by the user
+    // 1. Exact full-bleed gameplay background (glossy racetrack + waiting bays + yellow curbs + corner park bushes)
     Image(
       painter = painterResource(id = R.drawable.game_play_bg),
       contentDescription = null,
@@ -124,11 +142,13 @@ fun GameScreen(
       modifier = Modifier.fillMaxSize(),
     )
 
-    // 2. ZONE 1: Passengers circulating along the background's oval road loop & left ramp
+    // 2. ZONE 1: Passengers circulating along the background's oval road loop & left/right arms
     ConveyorTrackView(
       passengers = uiState.passengers,
       conveyorOffsetPx = uiState.conveyorOffsetPx,
       remainingCount = uiState.passengers.size,
+      showLaneDebug = uiState.showLaneDebug,
+      onViewportSized = { w, h -> viewModel.updateLaneViewport(w, h) },
       modifier = Modifier.fillMaxSize(),
     )
 
@@ -136,17 +156,18 @@ fun GameScreen(
     WaitingSlotsRow(
       slots = uiState.slots,
       vehicles = uiState.vehicles,
+      jumpingPassengers = uiState.jumpingPassengers,
       onSlotTap = { viewModel.onSlotTapped(it) },
       modifier = Modifier.fillMaxSize(),
     )
 
-    // 4. ZONE 2: Middle Parking Lot + Tunnels + Vehicles positioned inside the grey asphalt area
+    // 4. ZONE 2: Middle Parking Lot + Tunnels + Vehicles positioned cleanly inside the grey asphalt area
     Box(
       modifier =
         Modifier
-          .offset(y = screenH * 0.436f)
+          .offset(y = screenH * 0.398f)
           .fillMaxWidth()
-          .height(screenH * 0.434f)
+          .height(screenH * 0.475f)
     ) {
       ParkingLotCanvas(
         gridCols = uiState.gridCols,
@@ -157,33 +178,6 @@ fun GameScreen(
         onLotTap = { gx, gy -> viewModel.onLotTap(gx, gy) },
         modifier = Modifier.fillMaxSize(),
       )
-
-      // Tutorial or status banner floating gently at top of parking lot
-      val banner = uiState.statusBannerText ?: if (uiState.isTutorial) uiState.tutorialHintText else null
-      AnimatedVisibility(
-        visible = banner != null,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp),
-      ) {
-        if (banner != null) {
-          Box(
-            modifier =
-              Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color.White.copy(alpha = 0.94f))
-                .border(2.dp, OutlineInk, RoundedCornerShape(14.dp))
-                .padding(horizontal = 12.dp, vertical = 5.dp)
-          ) {
-            Text(
-              text = banner,
-              style = MaterialTheme.typography.labelSmall.copy(fontFamily = FredokaFontFamily, fontSize = 12.sp),
-              color = OutlineInk,
-              textAlign = TextAlign.Center,
-            )
-          }
-        }
-      }
     }
 
     // 5. TOP HUD: Coins (left) + Glossy Level N Banner (center) + Pause (right, replacing '?')
@@ -192,6 +186,7 @@ fun GameScreen(
         Modifier
           .align(Alignment.TopCenter)
           .windowInsetsPadding(WindowInsets.statusBars)
+          .windowInsetsPadding(WindowInsets.displayCutout)
           .widthIn(max = 560.dp)
           .fillMaxWidth()
           .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -206,7 +201,7 @@ fun GameScreen(
       Box(
         modifier =
           Modifier
-            .width(128.dp)
+            .width(136.dp)
             .height(48.dp)
             .testTag("level_banner"),
         contentAlignment = Alignment.Center,
@@ -214,7 +209,7 @@ fun GameScreen(
         Image(
           painter = painterResource(id = R.drawable.btn_hud_level),
           contentDescription = "Level ${uiState.levelNumber}",
-          contentScale = ContentScale.FillBounds,
+          contentScale = ContentScale.Fit,
           modifier = Modifier.fillMaxSize(),
         )
         Text(
@@ -223,73 +218,127 @@ fun GameScreen(
             MaterialTheme.typography.titleMedium.copy(
               fontFamily = FredokaFontFamily,
               fontSize = 18.sp,
-              fontWeight = FontWeight.Bold,
-              shadow = Shadow(color = Color(0xFF0A4A8A), offset = Offset(0f, 3f), blurRadius = 2f),
+              fontWeight = FontWeight.ExtraBold,
+              shadow = Shadow(color = Color(0xFF7B4A00), offset = Offset(0f, 2.5f), blurRadius = 2f),
             ),
-          color = Color.White,
+          color = Color(0xFFFFD84D),
           maxLines = 1,
+          modifier = Modifier.padding(start = 32.dp, end = 10.dp),
         )
       }
 
-      Box(
-        modifier =
-          Modifier
-            .size(48.dp)
-            .clickable { viewModel.pauseGame() }
-            .testTag("pause_button"),
-        contentAlignment = Alignment.Center,
-      ) {
-        Image(
-          painter = painterResource(id = R.drawable.btn_hud_pause),
-          contentDescription = "Pause",
-          contentScale = ContentScale.Fit,
-          modifier = Modifier.fillMaxSize(),
-        )
+      Column(horizontalAlignment = Alignment.End) {
+        Box(
+          modifier =
+            Modifier
+              .size(48.dp)
+              .clickable { viewModel.pauseGame() }
+              .testTag("pause_button"),
+          contentAlignment = Alignment.Center,
+        ) {
+          Image(
+            painter = painterResource(id = R.drawable.btn_hud_pause),
+            contentDescription = "Pause",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+          )
+        }
+        Box(
+          modifier =
+            Modifier
+              .size(48.dp)
+              .clickable { viewModel.toggleLaneDebug() }
+              .testTag("debug_lane_toggle"),
+          contentAlignment = Alignment.TopEnd,
+        ) {
+          Box(
+            modifier =
+              Modifier
+                .padding(top = 2.dp)
+                .size(width = 34.dp, height = 22.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (uiState.showLaneDebug) Color(0xCC0D9488) else Color(0x881A2438))
+                .border(1.4.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center,
+          ) {
+            Text(
+              text = "D",
+              style = MaterialTheme.typography.labelSmall.copy(fontFamily = FredokaFontFamily, fontSize = 11.sp),
+              color = Color.White,
+            )
+          }
+        }
       }
     }
 
-    // 6. ZONE 3: Bottom Booster Bar (Board, Shuffle, VIP Slot)
+    // 6. ZONE 3: Bottom Booster Bar with the 3 custom glossy buttons (Board, Refresh, VIP Slot)
     Row(
       modifier =
         Modifier
           .align(Alignment.BottomCenter)
           .windowInsetsPadding(WindowInsets.navigationBars)
-          .widthIn(max = 560.dp)
+          .widthIn(max = 460.dp)
           .fillMaxWidth()
-          .padding(horizontal = 12.dp, vertical = 8.dp),
-      horizontalArrangement = Arrangement.spacedBy(10.dp),
+          .padding(horizontal = 24.dp, vertical = 10.dp),
+      horizontalArrangement = Arrangement.SpaceEvenly,
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      BoosterButton(
-        title = "Board",
-        icon = Icons.Filled.DirectionsRun,
+      ImageBoosterButton(
+        drawableRes = R.drawable.btn_booster_board,
+        contentDescription = "Board Passengers",
         ownedCount = uiState.boardBoosters,
-        topColor = PlayGreen,
-        bottomColor = PlayGreenDark,
-        onClick = { viewModel.onBoosterTapped(BoosterType.BOARD) },
-        modifier = Modifier.weight(1f),
         testTag = "booster_board",
+        onClick = { viewModel.onBoosterTapped(BoosterType.BOARD) },
       )
-      BoosterButton(
-        title = "Shuffle",
-        icon = Icons.Filled.Shuffle,
+
+      ImageBoosterButton(
+        drawableRes = R.drawable.btn_booster_refresh,
+        contentDescription = "Refresh Vehicles",
         ownedCount = uiState.refreshBoosters,
-        topColor = HudBlue,
-        bottomColor = HudBlueDark,
-        onClick = { viewModel.onBoosterTapped(BoosterType.REFRESH) },
-        modifier = Modifier.weight(1f),
         testTag = "booster_refresh",
+        onClick = { viewModel.onBoosterTapped(BoosterType.REFRESH) },
       )
-      BoosterButton(
-        title = "VIP Slot",
-        icon = Icons.Filled.LocalParking,
+
+      ImageBoosterButton(
+        drawableRes = R.drawable.btn_booster_vip,
+        contentDescription = "VIP Parking Slot",
         ownedCount = uiState.vipBoosters,
-        topColor = ShopPurple,
-        bottomColor = ShopPurpleDark,
-        onClick = { viewModel.onBoosterTapped(BoosterType.VIP_SLOT) },
-        modifier = Modifier.weight(1f),
         testTag = "booster_vip",
+        onClick = { viewModel.onBoosterTapped(BoosterType.VIP_SLOT) },
       )
+    }
+
+    // Bottom hint (Level 1 only) / status banner placed cleanly above the booster buttons
+    val banner =
+      uiState.statusBannerText ?: if (uiState.isTutorial && uiState.levelNumber == 1) uiState.tutorialHintText else null
+    AnimatedVisibility(
+      visible = banner != null,
+      enter = fadeIn(),
+      exit = fadeOut(),
+      modifier =
+        Modifier
+          .align(Alignment.BottomCenter)
+          .windowInsetsPadding(WindowInsets.navigationBars)
+          .padding(start = 16.dp, end = 16.dp, bottom = 92.dp),
+    ) {
+      if (banner != null) {
+        Box(
+          modifier =
+            Modifier
+              .clip(RoundedCornerShape(14.dp))
+              .background(Color.White.copy(alpha = 0.95f))
+              .border(2.dp, OutlineInk, RoundedCornerShape(14.dp))
+              .padding(horizontal = 14.dp, vertical = 6.dp)
+              .testTag("bottom_hint_banner")
+        ) {
+          Text(
+            text = banner,
+            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FredokaFontFamily, fontSize = 12.sp),
+            color = OutlineInk,
+            textAlign = TextAlign.Center,
+          )
+        }
+      }
     }
 
     // 7. Full-bleed Playfield Effects Overlay (Driving buses + dotted trail, jumping stickmen, confetti, "+1")
@@ -329,8 +378,13 @@ fun GameScreen(
     PauseDialog(
       soundEnabled = uiState.soundEnabled,
       vibrationEnabled = uiState.vibrationEnabled,
+      cloudSaveEnabled = uiState.cloudSaveEnabled,
+      languageLabel = uiState.languageLabel,
       onToggleSound = { viewModel.toggleSound(it) },
       onToggleVibration = { viewModel.toggleVibration(it) },
+      onToggleCloudSave = { viewModel.toggleCloudSave(it) },
+      onCycleLanguage = { viewModel.cycleLanguage() },
+      onOpenSupport = { viewModel.toggleHelp(true) },
       onResume = { viewModel.resumeGame() },
       onRestart = { viewModel.restartLevel() },
       onHome = onNavigateHome,
@@ -347,6 +401,7 @@ fun GameScreen(
       booster = activeBooster,
       coins = uiState.coins,
       notice = uiState.shopNotice,
+      onGetFree = { viewModel.claimFreeBooster(activeBooster) },
       onBuy = { viewModel.buyAndUseBooster(activeBooster) },
       onDismiss = { viewModel.dismissBoosterShop() },
     )
@@ -377,67 +432,51 @@ fun GameScreen(
 }
 
 @Composable
-private fun BoosterButton(
-  title: String,
-  icon: ImageVector,
+private fun ImageBoosterButton(
+  drawableRes: Int,
+  contentDescription: String,
   ownedCount: Int,
-  topColor: Color,
-  bottomColor: Color,
-  onClick: () -> Unit,
-  modifier: Modifier = Modifier,
   testTag: String,
+  onClick: () -> Unit,
 ) {
-  Box(modifier = modifier) {
-    Row(
-      modifier =
-        Modifier
-          .fillMaxWidth()
-          .height(54.dp)
-          .clip(RoundedCornerShape(16.dp))
-          .background(bottomColor)
-          .padding(bottom = 4.dp)
-          .clip(RoundedCornerShape(14.dp))
-          .background(topColor)
-          .border(2.2.dp, OutlineInk, RoundedCornerShape(14.dp))
-          .clickable(onClick = onClick)
-          .padding(horizontal = 8.dp)
-          .testTag(testTag),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.Center,
-    ) {
-      Icon(icon, contentDescription = title, tint = Color.White, modifier = Modifier.size(20.dp))
-      Spacer(Modifier.width(5.dp))
-      Column(horizontalAlignment = Alignment.Start) {
+  Box(
+    modifier =
+      Modifier
+        .size(76.dp)
+        .clip(RoundedCornerShape(16.dp))
+        .clickable(onClick = onClick)
+        .testTag(testTag),
+    contentAlignment = Alignment.Center,
+  ) {
+    Image(
+      painter = painterResource(id = drawableRes),
+      contentDescription = contentDescription,
+      contentScale = ContentScale.Fit,
+      modifier = Modifier.fillMaxSize(),
+    )
+
+    // When the player owns >= 1 of this booster, cover the built-in red '+' badge with a green count pill
+    if (ownedCount > 0) {
+      Box(
+        modifier =
+          Modifier
+            .align(Alignment.BottomEnd)
+            .size(26.dp)
+            .clip(CircleShape)
+            .background(
+              Brush.verticalGradient(
+                colors = listOf(PlayGreen, PlayGreenDark),
+              )
+            )
+            .border(2.dp, Color.White, CircleShape),
+        contentAlignment = Alignment.Center,
+      ) {
         Text(
-          text = title,
-          style = MaterialTheme.typography.labelLarge.copy(fontFamily = FredokaFontFamily, fontSize = 13.sp),
+          text = ownedCount.toString(),
+          style = MaterialTheme.typography.labelSmall.copy(fontFamily = FredokaFontFamily, fontSize = 13.sp),
           color = Color.White,
-          maxLines = 1,
-        )
-        Text(
-          text = if (ownedCount > 0) "x$ownedCount" else "200",
-          style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-          color = Color.White.copy(alpha = 0.9f),
         )
       }
-    }
-
-    // Red '+' badge when ownedCount == 0, or green count pill when > 0
-    Box(
-      modifier =
-        Modifier
-          .align(Alignment.TopEnd)
-          .size(22.dp)
-          .clip(CircleShape)
-          .background(if (ownedCount == 0) AlertRed else GoldCoinDark)
-          .border(1.8.dp, Color.White, CircleShape),
-      contentAlignment = Alignment.Center,
-    ) {
-      Text(
-        text = if (ownedCount == 0) "+" else ownedCount.toString(),
-        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FredokaFontFamily, fontSize = 12.sp),
-        color = Color.White,
-      )
     }
   }
 }

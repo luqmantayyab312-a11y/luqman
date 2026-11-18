@@ -4,68 +4,120 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.PI
 
 enum class VehicleColor(
+  val assetKey: String,
   val label: String,
   val fill: Color,
   val highlight: Color,
   val shade: Color,
   val passengerFill: Color,
+  val roofLight: Color,
+  val roofMain: Color,
+  val roofDark: Color,
 ) {
   RED(
+    assetKey = "red",
     label = "Red",
-    fill = Color(0xFFFF4655),
-    highlight = Color(0xFFFF7B86),
-    shade = Color(0xFFC82333),
-    passengerFill = Color(0xFFFF4655),
-  ),
-  GREEN(
-    label = "Green",
-    fill = Color(0xFF2ECC5A),
-    highlight = Color(0xFF66E489),
-    shade = Color(0xFF1B963D),
-    passengerFill = Color(0xFF2ECC5A),
+    fill = Color(0xFFF21B3F),
+    highlight = Color(0xFFFF7A93),
+    shade = Color(0xFF9C0F28),
+    passengerFill = Color(0xFFF21B3F),
+    roofLight = Color(0xFFFF7A93),
+    roofMain = Color(0xFFF21B3F),
+    roofDark = Color(0xFF9C0F28),
   ),
   BLUE(
+    assetKey = "blue",
     label = "Blue",
-    fill = Color(0xFF2B7FFF),
-    highlight = Color(0xFF6BA7FF),
-    shade = Color(0xFF1556C4),
-    passengerFill = Color(0xFF2B7FFF),
+    fill = Color(0xFF1F7BFF),
+    highlight = Color(0xFF8FCDFF),
+    shade = Color(0xFF0E43A8),
+    passengerFill = Color(0xFF1F7BFF),
+    roofLight = Color(0xFF8FCDFF),
+    roofMain = Color(0xFF1F7BFF),
+    roofDark = Color(0xFF0E43A8),
   ),
-  CYAN(
-    label = "Cyan",
-    fill = Color(0xFF16C8E8),
-    highlight = Color(0xFF68E3F8),
-    shade = Color(0xFF0A8FB0),
-    passengerFill = Color(0xFF16C8E8),
+  GREEN(
+    assetKey = "green",
+    label = "Green",
+    fill = Color(0xFF5FD02A),
+    highlight = Color(0xFFC9FF86),
+    shade = Color(0xFF2B8410),
+    passengerFill = Color(0xFF5FD02A),
+    roofLight = Color(0xFFC9FF86),
+    roofMain = Color(0xFF5FD02A),
+    roofDark = Color(0xFF2B8410),
   ),
   YELLOW(
+    assetKey = "yellow",
     label = "Yellow",
-    fill = Color(0xFFFFC926),
-    highlight = Color(0xFFFFE073),
-    shade = Color(0xFFD69A00),
-    passengerFill = Color(0xFFFFC926),
+    fill = Color(0xFFFFD000),
+    highlight = Color(0xFFFFF58A),
+    shade = Color(0xFFC29200),
+    passengerFill = Color(0xFFFFD000),
+    roofLight = Color(0xFFFFF58A),
+    roofMain = Color(0xFFFFD000),
+    roofDark = Color(0xFFC29200),
   ),
-  ORANGE(
-    label = "Orange",
-    fill = Color(0xFFFF7D26),
-    highlight = Color(0xFFFFA86B),
-    shade = Color(0xFFCC5200),
-    passengerFill = Color(0xFFFF7D26),
+  PURPLE(
+    assetKey = "purple",
+    label = "Purple",
+    fill = Color(0xFF9A3CF0),
+    highlight = Color(0xFFDCA6FF),
+    shade = Color(0xFF5A19A3),
+    passengerFill = Color(0xFF9A3CF0),
+    roofLight = Color(0xFFDCA6FF),
+    roofMain = Color(0xFF9A3CF0),
+    roofDark = Color(0xFF5A19A3),
   ),
   WHITE(
+    assetKey = "white",
     label = "White",
-    fill = Color(0xFFF4F7FC),
+    fill = Color(0xFFEBF0F7),
     highlight = Color(0xFFFFFFFF),
-    shade = Color(0xFFC5D0E0),
-    passengerFill = Color(0xFFF4F7FC),
+    shade = Color(0xFF8F9CB0),
+    passengerFill = Color(0xFFEBF0F7),
+    roofLight = Color(0xFFFFFFFF),
+    roofMain = Color(0xFFEBF0F7),
+    roofDark = Color(0xFF8F9CB0),
+  ),
+  CYAN(
+    assetKey = "cyan",
+    label = "Cyan",
+    fill = Color(0xFF14D4E0),
+    highlight = Color(0xFF9BF9FC),
+    shade = Color(0xFF0A7D88),
+    passengerFill = Color(0xFF14D4E0),
+    roofLight = Color(0xFF9BF9FC),
+    roofMain = Color(0xFF14D4E0),
+    roofDark = Color(0xFF0A7D88),
+  ),
+  ORANGE(
+    assetKey = "orange",
+    label = "Orange",
+    fill = Color(0xFFFF8A00),
+    highlight = Color(0xFFFFC978),
+    shade = Color(0xFFC05200),
+    passengerFill = Color(0xFFFF8A00),
+    roofLight = Color(0xFFFFC978),
+    roofMain = Color(0xFFFF8A00),
+    roofDark = Color(0xFFC05200),
   ),
   BROWN(
+    assetKey = "brown",
     label = "Brown",
     fill = Color(0xFFA46338),
-    highlight = Color(0xFFC88A5E),
-    shade = Color(0xFF75401E),
+    highlight = Color(0xFFE3A67D),
+    shade = Color(0xFF663718),
     passengerFill = Color(0xFFA46338),
-  ),
+    roofLight = Color(0xFFE3A67D),
+    roofMain = Color(0xFFA46338),
+    roofDark = Color(0xFF663718),
+  );
+
+  companion object {
+    val busColors: List<VehicleColor> =
+      listOf(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE)
+  }
 }
 
 enum class Direction(val dx: Float, val dy: Float, val angleDeg: Float) {
@@ -91,6 +143,7 @@ enum class TunnelSide {
 }
 
 enum class VehicleStage {
+  INTRO_SLIDING,
   IN_LOT,
   SPAWNING_FROM_TUNNEL,
   EXITING_LOT,
@@ -126,17 +179,13 @@ data class LevelDefinition(
   val vehicles: List<VehicleSpec>,
   val tunnels: List<TunnelSpec> = emptyList(),
   val passengerSequence: List<VehicleColor>,
-  val conveyorSpeedDpPerSec: Float = 46f,
+  val conveyorSpeedDpPerSec: Float = 40f,
+  val freeSlots: Int = 4,
   val isTutorial: Boolean = false,
   val tutorialHintText: String? = null,
 )
 
-fun vehicleLengthForCapacity(capacity: Int): Float =
-  when {
-    capacity >= 28 -> 2.15f
-    capacity >= 24 -> 1.78f
-    else -> 1.44f
-  }
+fun vehicleLengthForCapacity(@Suppress("UNUSED_PARAMETER") capacity: Int): Float = 1.84f
 
 data class VehicleEntity(
   val id: Int,
@@ -153,18 +202,20 @@ data class VehicleEntity(
   val shakePhase: Float = 0f,
   val flashRedTimer: Float = 0f,
   val animProgress: Float = 0f,
+  val introDelayRemaining: Float = 0f,
   val startX: Float = x,
   val startY: Float = y,
   val targetX: Float = x,
   val targetY: Float = y,
   val bounceTimer: Float = 0f,
   val squashFactor: Float = 1f,
+  val roofOpenProgress: Float = 0f,
 ) {
   val lengthInCells: Float
     get() = vehicleLengthForCapacity(capacity)
 
   val widthInCells: Float
-    get() = if (direction.isDiagonal) 0.70f else 0.76f
+    get() = 0.84f
 }
 
 data class TunnelState(
@@ -192,10 +243,13 @@ data class ConveyorPassenger(
   val id: Int,
   val color: VehicleColor,
   val queueIndex: Int,
-  val trackPos: Float, // normalized distance along its curved side branch
+  val trackPos: Float, // legacy normalized hint
   val rowGroupId: Int = 0,
-  val branch: Int = 0, // 0 = left feeder + oval curve, 1 = right feeder + oval curve
-  val colInRow: Int = 0, // 0..3 across the 4-toy row
+  val branch: Int = 0, // 0 = left feeder, 1 = right feeder
+  val colInRow: Int = 0, // 0..3 strictly inside the 4-column lane
+  val segment: ConveyorSegment = ConveyorSegment.RING,
+  val distDp: Float = 0f,
+  val isWalking: Boolean = true,
 )
 
 data class JumpingPassenger(
@@ -206,7 +260,7 @@ data class JumpingPassenger(
   val startNormX: Float,
   val startNormY: Float,
   val progress: Float = 0f, // 0f..1f
-  val speed: Float = 2.6f,
+  val speed: Float = 1f / 0.35f,
 )
 
 data class Particle(
@@ -243,7 +297,7 @@ enum class BoosterType(
     costCoins = 200,
   ),
   REFRESH(
-    title = "Shuffle Lot",
+    title = "Refresh",
     description = "Reshuffles all vehicles still in the parking lot into a fresh solvable layout.",
     costCoins = 200,
   ),
@@ -282,11 +336,13 @@ data class GameUiState(
   val tutorialHintText: String? = null,
   val statusBannerText: String? = null,
   val coins: Int = 160,
-  val boardBoosters: Int = 0,
+  val boardBoosters: Int = 1,
   val refreshBoosters: Int = 0,
   val vipBoosters: Int = 0,
   val soundEnabled: Boolean = true,
   val vibrationEnabled: Boolean = true,
+  val cloudSaveEnabled: Boolean = true,
+  val languageLabel: String = "English",
   val activeBoosterShop: BoosterType? = null,
   val activeSlotUnlockIndex: Int? = null,
   val showHelpDialog: Boolean = false,
@@ -294,4 +350,5 @@ data class GameUiState(
   val shopNotice: String? = null,
   val usedRevive: Boolean = false,
   val bumpsCount: Int = 0,
+  val showLaneDebug: Boolean = false,
 )

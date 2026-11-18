@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -20,6 +21,8 @@ data class PlayerProgress(
   val vipBoosters: Int = 0,
   val soundEnabled: Boolean = true,
   val vibrationEnabled: Boolean = true,
+  val cloudSaveEnabled: Boolean = true,
+  val languageLabel: String = "English",
   val noAdsUnlocked: Boolean = false,
   val starterPackClaimed: Boolean = false,
 )
@@ -34,6 +37,8 @@ class GamePreferencesRepository(private val context: Context) {
     val VIP_BOOSTERS = intPreferencesKey("vip_boosters")
     val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
     val VIBRATION_ENABLED = booleanPreferencesKey("vibration_enabled")
+    val CLOUD_SAVE_ENABLED = booleanPreferencesKey("cloud_save_enabled")
+    val LANGUAGE_LABEL = stringPreferencesKey("language_label")
     val NO_ADS_UNLOCKED = booleanPreferencesKey("no_ads_unlocked")
     val STARTER_PACK_CLAIMED = booleanPreferencesKey("starter_pack_claimed")
   }
@@ -48,6 +53,8 @@ class GamePreferencesRepository(private val context: Context) {
         vipBoosters = (prefs[Keys.VIP_BOOSTERS] ?: 0).coerceAtLeast(0),
         soundEnabled = prefs[Keys.SOUND_ENABLED] ?: true,
         vibrationEnabled = prefs[Keys.VIBRATION_ENABLED] ?: true,
+        cloudSaveEnabled = prefs[Keys.CLOUD_SAVE_ENABLED] ?: true,
+        languageLabel = prefs[Keys.LANGUAGE_LABEL] ?: "English",
         noAdsUnlocked = prefs[Keys.NO_ADS_UNLOCKED] ?: false,
         starterPackClaimed = prefs[Keys.STARTER_PACK_CLAIMED] ?: false,
       )
@@ -82,6 +89,14 @@ class GamePreferencesRepository(private val context: Context) {
 
   suspend fun setVibrationEnabled(enabled: Boolean) {
     context.gameDataStore.edit { it[Keys.VIBRATION_ENABLED] = enabled }
+  }
+
+  suspend fun setCloudSaveEnabled(enabled: Boolean) {
+    context.gameDataStore.edit { it[Keys.CLOUD_SAVE_ENABLED] = enabled }
+  }
+
+  suspend fun setLanguageLabel(label: String) {
+    context.gameDataStore.edit { it[Keys.LANGUAGE_LABEL] = label }
   }
 
   suspend fun claimStarterPack() {

@@ -149,8 +149,8 @@ object CollisionEngine {
   }
 
   /**
-   * Checks whether all vehicles currently in the parking lot plus all queued tunnel vehicles
-   * can be cleared from the lot in at least one valid order.
+   * Verifies with backtracking DFS (and visited-state memoization) whether there exists
+   * a valid tap order to clear all vehicles in the lot and queued tunnels.
    */
   fun canClearAll(
     lotVehicles: List<VehicleEntity>,
@@ -158,61 +158,145 @@ object CollisionEngine {
     gridCols: Int,
     gridRows: Int,
   ): Boolean {
-    val active = lotVehicles.toMutableList()
-    val tunnelQueues = tunnels.associate { it.id to it.queue.toMutableList() }.toMutableMap()
-    var nextSyntheticId = 100_000
+    if (tunnels.all { it.queue.isEmpty() } && lotVehicles.size <= 30) {
+      return solveLotDfs(lotVehicles, gridCols, gridRows)
+    }
+    return solveWithTunnelsDfs(
+      active = lotVehicles,
+      tunnelQueues = tunnels.map { it to it.queue },
+      gridCols = gridCols,
+      gridRows = gridRows,
+      nextSyntheticId = 100_000,
+      stepsRemaining = 120,
+    )
+  }
 
-    fun spawnReadyTunnels() {
-      var spawned: Boolean
-      do {
-        spawned = false
-        for (tunnel in tunnels) {
-          val q = tunnelQueues[tunnel.id] ?: continue
-          if (q.isEmpty()) continue
-          val nextSpec = q.first()
-          val length = vehicleLengthForCapacity(nextSpec.capacity)
-          val spawnX =
-            if (tunnel.side == TunnelSide.LEFT) {
-              length * 0.5f + 0.12f
-            } else {
-              gridCols - length * 0.5f - 0.12f
-            }
-          val spawnY = tunnel.row + 0.5f
-          val candidate =
-            VehicleEntity(
-              id = nextSyntheticId++,
-              color = nextSpec.color,
-              direction = nextSpec.direction,
-              capacity = nextSpec.capacity,
-              x = spawnX,
-              y = spawnY,
-            )
-          val candidateBox = boxForVehicle(candidate)
-          val blocked = active.any { overlaps(candidateBox, boxForVehicle(it)) }
-          if (!blocked) {
-            q.removeAt(0)
-            active.add(candidate)
-            spawned = true
+  private fun solveLotDfs(
+    lotVehicles: List<VehicleEntity>,
+    gridCols: Int,
+    gridRows: Int,
+  ): Boolean {
+    val n = lotVehicles.size
+    if (n == 0) return true
+
+    // Precompute which vehicles block each vehicle i along its straight exit path
+    val blockersMask = IntArray(n)
+    val boxes = Array(n) { boxForVehicle(lotVehicles[it]) }
+    for (i in 0 until n) {
+      val v = lotVehicles[i]
+      val step = 0.08f
+      val maxDist = max(gridCols, gridRows).toFloat() + v.lengthInCells + 2.0f
+      var dist = step
+      var mask = 0
+      while (dist <= maxDist) {
+        val nx = v.x + v.direction.dx * dist
+        val ny = v.y + v.direction.dy * dist
+        val sweptBox = boxForVehicle(v, nx, ny)
+        for (j in 0 until n) {
+          if (i == j) continue
+          if (overlaps(sweptBox, boxes[j])) {
+            mask = mask or (1 shl j)
           }
         }
-      } while (spawned)
+        val outX = nx < -v.lengthInCells * 0.6f || nx > gridCols + v.lengthInCells * 0.6f
+        val outY = ny < -v.lengthInCells * 0.6f || ny > gridRows + v.lengthInCells * 0.6f
+        if (outX || outY) break
+        dist += step
+      }
+      blockersMask[i] = mask
     }
 
-    spawnReadyTunnels()
+    val fullMask = (1 shl n) - 1
+    val failedStates = HashSet<Int>()
+    var visitedStates = 0
 
-    var safety = 0
-    while (active.isNotEmpty() && safety < 250) {
-      safety++
-      val clearVehicle =
-        active.firstOrNull { candidate ->
-          checkPath(candidate, active, gridCols, gridRows).isClear
-        } ?: return false
+    fun dfs(presentMask: Int): Boolean {
+      if (presentMask == 0) return true
+      if (presentMask in failedStates) return false
+      if (++visitedStates > 8000) return false
 
-      active.remove(clearVehicle)
-      spawnReadyTunnels()
+      for (i in 0 until n) {
+        if ((presentMask and (1 shl i)) == 0) continue
+        if ((blockersMask[i] and presentMask) == 0) {
+          if (dfs(presentMask xor (1 shl i))) return true
+        }
+      }
+      failedStates.add(presentMask)
+      return false
     }
 
-    return active.isEmpty() && tunnelQueues.values.all { it.isEmpty() }
+    return dfs(fullMask)
+  }
+
+  private fun solveWithTunnelsDfs(
+    active: List<VehicleEntity>,
+    tunnelQueues: List<Pair<TunnelState, List<TunnelVehicleSpec>>>,
+    gridCols: Int,
+    gridRows: Int,
+    nextSyntheticId: Int,
+    stepsRemaining: Int,
+  ): Boolean {
+    val curActive = active.toMutableList()
+    val curQueues = tunnelQueues.map { it.first to it.second.toMutableList() }
+    var synthId = nextSyntheticId
+
+    var spawned: Boolean
+    do {
+      spawned = false
+      for ((tunnel, q) in curQueues) {
+        if (q.isEmpty()) continue
+        val nextSpec = q.first()
+        val length = vehicleLengthForCapacity(nextSpec.capacity)
+        val spawnX =
+          if (tunnel.side == TunnelSide.LEFT) length * 0.5f + 0.12f
+          else gridCols - length * 0.5f - 0.12f
+        val spawnY = tunnel.row + 0.5f
+        val candidate =
+          VehicleEntity(
+            id = synthId,
+            color = nextSpec.color,
+            direction = nextSpec.direction,
+            capacity = nextSpec.capacity,
+            x = spawnX,
+            y = spawnY,
+          )
+        val candidateBox = boxForVehicle(candidate)
+        if (curActive.none { overlaps(candidateBox, boxForVehicle(it)) }) {
+          q.removeAt(0)
+          curActive.add(candidate)
+          synthId++
+          spawned = true
+        }
+      }
+    } while (spawned)
+
+    if (curActive.isEmpty() && curQueues.all { it.second.isEmpty() }) return true
+    if (stepsRemaining <= 0) return false
+
+    val clearCandidates = curActive.filter { checkPath(it, curActive, gridCols, gridRows).isClear }
+    if (clearCandidates.isEmpty()) return false
+
+    for (candidate in clearCandidates.take(4)) {
+      val nextActive = curActive.filter { it.id != candidate.id }
+      val nextQueues = curQueues.map { it.first to it.second.toList() }
+      if (solveWithTunnelsDfs(nextActive, nextQueues, gridCols, gridRows, synthId, stepsRemaining - 1)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  fun isGreedySolvable(
+    lotVehicles: List<VehicleEntity>,
+    gridCols: Int,
+    gridRows: Int,
+  ): Boolean {
+    val remaining = lotVehicles.toMutableList()
+    while (remaining.isNotEmpty()) {
+      val free = remaining.firstOrNull { checkPath(it, remaining, gridCols, gridRows).isClear } ?: return false
+      remaining.remove(free)
+    }
+    return true
   }
 
   fun firstUnblockedVehicleId(
@@ -221,11 +305,12 @@ object CollisionEngine {
     gridRows: Int,
   ): Int? {
     return lotVehicles.firstOrNull { v ->
-      v.stage == VehicleStage.IN_LOT && checkPath(v, lotVehicles, gridCols, gridRows).isClear
+      (v.stage == VehicleStage.IN_LOT || v.stage == VehicleStage.INTRO_SLIDING) &&
+        checkPath(v, lotVehicles, gridCols, gridRows).isClear
     }?.id
   }
 
-  fun pointHitsVehicle(px: Float, py: Float, v: VehicleEntity, extraPadding: Float = 0.16f): Boolean {
+  fun pointHitsVehicle(px: Float, py: Float, v: VehicleEntity, extraPadding: Float = 0.08f): Boolean {
     val dx = px - v.x
     val dy = py - v.y
     val cosA = cos(-v.direction.angleRad)
